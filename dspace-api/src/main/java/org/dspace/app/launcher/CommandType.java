@@ -1,6 +1,8 @@
 
 package org.dspace.app.launcher;
 
+import org.springframework.beans.factory.annotation.Required;
+
 import java.util.ArrayList;
 import java.util.List;
 import javax.xml.bind.annotation.XmlAccessType;
@@ -42,7 +44,9 @@ public class CommandType {
     protected String name;
     @XmlElement(required = true)
     protected String description;
+
     @XmlElement(required = true)
+
     protected List<StepType> step;
 
     /**
@@ -65,6 +69,7 @@ public class CommandType {
      *     {@link String }
      *     
      */
+    @Required
     public void setName(String value) {
         this.name = value;
     }
@@ -89,8 +94,14 @@ public class CommandType {
      *     {@link String }
      *     
      */
+    @Required
     public void setDescription(String value) {
         this.description = value;
+    }
+
+    @Required
+    public void setStep(List<StepType> step) {
+        this.step = step;
     }
 
     /**
@@ -104,6 +115,7 @@ public class CommandType {
      * 
      * <p>
      * For example, to add a new item, do as follows:
+
      * <pre>
      *    getStep().add(newItem);
      * </pre>

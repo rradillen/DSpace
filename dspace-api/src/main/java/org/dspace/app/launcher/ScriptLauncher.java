@@ -20,6 +20,7 @@ import org.dspace.core.ConfigurationManager;
 import org.dspace.servicemanager.DSpaceKernelImpl;
 import org.dspace.servicemanager.DSpaceKernelInit;
 import org.dspace.services.RequestService;
+import org.dspace.utils.DSpace;
 import org.jdom.Document;
 import org.jdom.Element;
 import org.jdom.input.SAXBuilder;
@@ -39,8 +40,6 @@ public class ScriptLauncher
     /** The service manager kernel */
     private static transient DSpaceKernelImpl kernelImpl;
 
-    /** Definitions of all commands. */
-    private static final List<CommandType> commandConfigs = getConfig();
 
     /**
      * Execute the DSpace script launcher
@@ -51,19 +50,22 @@ public class ScriptLauncher
             throws FileNotFoundException, IOException
     {
         // Check that there is at least one argument
-        if (args.length < 1)
-        {
-            System.err.println("You must provide at least one command argument");
-            display();
-            System.exit(1);
-        }
+
 
         // Initialise the service manager kernel
         try {
             kernelImpl = DSpaceKernelInit.getKernel(null);
+
             if (!kernelImpl.isRunning())
             {
                 kernelImpl.start(ConfigurationManager.getProperty("dspace.dir"));
+            }
+
+            if (args.length < 1)
+            {
+                System.err.println("You must provide at least one command argument");
+                display();
+                System.exit(1);
             }
         } catch (Exception e)
         {
@@ -104,7 +106,7 @@ public class ScriptLauncher
     {
         String request = args[0];
 
-        List<CommandType> commands = commandConfigs;
+        List<CommandType> commands = getConfig();
         CommandType command = null;
         for (CommandType candidate : commands)
         {
@@ -269,7 +271,10 @@ public class ScriptLauncher
             JAXBContext jaxbContext = JAXBContext.newInstance(CommandsType.class.getPackage().getName());
             Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
             CommandsType commands = ((JAXBElement<CommandsType>)unmarshaller.unmarshal(new File(config))).getValue();
-            return new LinkedList<>(commands.getCommand());
+            List<CommandType> composite=new LinkedList<>();
+            composite.addAll(new DSpace().getServiceManager().getServicesByType(CommandType.class));
+            composite.addAll(commands.getCommand());
+            return composite;
 
         }
         catch (Exception e)
@@ -288,7 +293,7 @@ public class ScriptLauncher
     private static void display()
     {
         // List all command elements
-        List<CommandType> commands = commandConfigs;
+        List<CommandType> commands = getConfig();
 
         // Sort the commands by name.
         // We cannot just use commands.sort() because it tries to remove and

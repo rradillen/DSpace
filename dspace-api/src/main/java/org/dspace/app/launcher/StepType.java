@@ -1,6 +1,8 @@
 
 package org.dspace.app.launcher;
 
+import org.springframework.beans.factory.annotation.Required;
+
 import java.util.ArrayList;
 import java.util.List;
 import javax.xml.bind.annotation.*;
@@ -59,9 +61,14 @@ public class StepType {
      *     {@link String }
      *     
      */
-
+    @Required
     public void setClassName(String value) {
         this.className = value;
+    }
+
+
+    public void setArgument(List<String> argument) {
+        this.argument = argument;
     }
 
     /**
@@ -87,6 +94,7 @@ public class StepType {
      * 
      */
     public List<String> getArgument() {
+
         if (argument == null) {
             argument = new ArrayList<String>();
         }
