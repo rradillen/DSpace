@@ -7,11 +7,15 @@
  */
 package org.dspace.app.launcher;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.TreeMap;
+
+import org.apache.commons.lang3.StringUtils;
 import org.dspace.core.ConfigurationManager;
 import org.dspace.servicemanager.DSpaceKernelImpl;
 import org.dspace.servicemanager.DSpaceKernelInit;
@@ -19,6 +23,10 @@ import org.dspace.services.RequestService;
 import org.jdom.Document;
 import org.jdom.Element;
 import org.jdom.input.SAXBuilder;
+
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBElement;
+import javax.xml.bind.Unmarshaller;
 
 /**
  * A DSpace script launcher.
@@ -32,7 +40,7 @@ public class ScriptLauncher
     private static transient DSpaceKernelImpl kernelImpl;
 
     /** Definitions of all commands. */
-    private static final Document commandConfigs = getConfig();
+    private static final List<CommandType> commandConfigs = getConfig();
 
     /**
      * Execute the DSpace script launcher
@@ -95,12 +103,12 @@ public class ScriptLauncher
     static int runOneCommand(String[] args)
     {
         String request = args[0];
-        Element root = commandConfigs.getRootElement();
-        List<Element> commands = root.getChildren("command");
-        Element command = null;
-        for (Element candidate : commands)
+
+        List<CommandType> commands = commandConfigs;
+        CommandType command = null;
+        for (CommandType candidate : commands)
         {
-            if (request.equalsIgnoreCase(candidate.getChild("name").getValue()))
+            if (request.equalsIgnoreCase(candidate.getName()))
             {
                 command = candidate;
                 break;
@@ -116,8 +124,8 @@ public class ScriptLauncher
         }
 
         // Run each step
-        List<Element> steps = command.getChildren("step");
-        for (Element step : steps)
+        List<StepType> steps = command.getStep();
+        for (StepType step : steps)
         {
             // Instantiate the class
             Class target = null;
@@ -134,7 +142,7 @@ public class ScriptLauncher
                 className = args[1];
             }
             else {
-                className = step.getChild("class").getValue();
+                className = step.getClassName();
             }
             try
             {
@@ -153,8 +161,7 @@ public class ScriptLauncher
             String[] useargs = args.clone();
             Class[] argTypes = {useargs.getClass()};
             boolean passargs = true;
-            if ((step.getAttribute("passuserargs") != null) &&
-                ("false".equalsIgnoreCase(step.getAttribute("passuserargs").getValue())))
+            if ((StringUtils.equals("false",step.getPassuserargs())))
             {
                 passargs = false;
             }
@@ -180,14 +187,14 @@ public class ScriptLauncher
             }
 
             // Add any extra properties
-            List<Element> bits = step.getChildren("argument");
-            if (step.getChild("argument") != null)
+            List<String> bits = step.getArgument();
+            if (bits != null)
             {
                 String[] argsnew = new String[useargs.length + bits.size()];
                 int i = 0;
-                for (Element arg : bits)
+                for (String arg : bits)
                 {
-                    argsnew[i++] = arg.getValue();
+                    argsnew[i++] = arg;
                 }
                 for (; i < bits.size() + useargs.length; i++)
                 {
@@ -250,25 +257,29 @@ public class ScriptLauncher
      *
      * @return The XML configuration file Document
      */
-    private static Document getConfig()
+    private static List<CommandType> getConfig()
     {
         // Load the launcher configuration file
         String config = ConfigurationManager.getProperty("dspace.dir") +
                         System.getProperty("file.separator") + "config" +
                         System.getProperty("file.separator") + "launcher.xml";
-        SAXBuilder saxBuilder = new SAXBuilder();
         Document doc = null;
         try
         {
-            doc = saxBuilder.build(config);
+            JAXBContext jaxbContext = JAXBContext.newInstance(CommandsType.class.getPackage().getName());
+            Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
+            CommandsType commands = ((JAXBElement<CommandsType>)unmarshaller.unmarshal(new File(config))).getValue();
+            return new LinkedList<>(commands.getCommand());
+
         }
         catch (Exception e)
         {
             System.err.println("Unable to load the launcher configuration file: [dspace]/config/launcher.xml");
             System.err.println(e.getMessage());
+            e.printStackTrace();
             System.exit(1);
         }
-        return doc;
+        return new LinkedList<>();
     }
 
     /**
@@ -277,23 +288,23 @@ public class ScriptLauncher
     private static void display()
     {
         // List all command elements
-        List<Element> commands = commandConfigs.getRootElement().getChildren("command");
+        List<CommandType> commands = commandConfigs;
 
         // Sort the commands by name.
         // We cannot just use commands.sort() because it tries to remove and
         // reinsert Elements within other Elements, and that doesn't work.
-        TreeMap<String, Element> sortedCommands = new TreeMap<>();
-        for (Element command : commands)
+        TreeMap<String, CommandType> sortedCommands = new TreeMap<>();
+        for (CommandType command : commands)
         {
-            sortedCommands.put(command.getChild("name").getValue(), command);
+            sortedCommands.put(command.getName(), command);
         }
 
         // Display the sorted list
         System.out.println("Usage: dspace [command-name] {parameters}");
-        for (Element command : sortedCommands.values())
+        for (CommandType command : sortedCommands.values())
         {
-            System.out.println(" - " + command.getChild("name").getValue() +
-                               ": " + command.getChild("description").getValue());
+            System.out.println(" - " + command.getName() +
+                               ": " + command.getDescription());
         }
     }
 }
