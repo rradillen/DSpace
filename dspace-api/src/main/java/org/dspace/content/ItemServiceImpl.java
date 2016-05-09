@@ -590,7 +590,7 @@ public class ItemServiceImpl extends DSpaceObjectServiceImpl<Item> implements It
         {
             harvestedItemService.delete(context, hi);
         }
-        
+
         item.getCollections().clear();
         item.setOwningCollection(null);
         rawDelete(context,item);
@@ -614,11 +614,19 @@ public class ItemServiceImpl extends DSpaceObjectServiceImpl<Item> implements It
         // Remove bundles
         removeAllBundles(context, item);
 
+        // remove version attached to the item
+        removeVersion(context, item);
+
+        //Only clear collections after we have removed everything else from the item
+        item.getCollections().clear();
+        item.setOwningCollection(null);
+
+        // remove all of our authorization policies
+        authorizeService.removeAllPolicies(context, item, false);
+
         // Remove any Handle
         handleService.unbindHandle(context, item);
 
-        // remove version attached to the item
-        removeVersion(context, item);
 
         // Finally remove item row
         itemDAO.delete(context, item);
